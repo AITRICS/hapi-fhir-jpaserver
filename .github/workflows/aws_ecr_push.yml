@@ -1,0 +1,42 @@
+name: Push Image to ECR
+
+on:
+  push:
+    branches:
+      - develop
+
+jobs:
+  push-image:
+    runs-on: 'ubuntu-22.04'
+    defaults:
+      run:
+        working-directory: ./
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: AKIA6QMDU7R5HQFEIEOF
+          aws-secret-access-key: ${{ secrets.AWS_997245385850_SECRET_ACCESS_KEY }}
+          aws-region: ap-northeast-2
+
+      - name: Declare Commit Hash variables
+        id: vars
+        shell: bash
+        run: |
+          echo "##[set-output name=branch_name;]$(echo ${GITHUB_REF#refs/heads/})"
+          echo "::set-output name=sha_short::$(git rev-parse --short HEAD)"
+      - name: Build image
+        run: docker build --platform linux/amd64 -t fhir .
+
+      - name: docker login
+        run: aws ecr get-login-password --region ap-northeast-2 | docker login --username AWS --password-stdin 997245385850.dkr.ecr.ap-northeast-2.amazonaws.com
+
+      - name: tag image
+        run: |
+          docker tag fhir:latest 997245385850.dkr.ecr.ap-northeast-2.amazonaws.com/${{ steps.vars.outputs.branch_name }}/fhir:latest
+          docker tag fhir:latest 997245385850.dkr.ecr.ap-northeast-2.amazonaws.com/${{ steps.vars.outputs.branch_name }}/fhir:${{ steps.vars.outputs.sha_short }}
+      - name: push image
+        run: docker push 997245385850.dkr.ecr.ap-northeast-2.amazonaws.com/${{ steps.vars.outputs.branch_name }}/fhir --all-tags
